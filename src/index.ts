@@ -10,10 +10,7 @@ import { wasUpdatedLast, readInPocket, unreadInNotion, notionToPocketAdd, readIn
 [] Add new Pocket saves to Notion
 */
 
-const notion = new Notion();
-const pocket = new Pocket();
-
-async function setReadInNotion() {
+async function setReadInNotion(notion: Notion, pocket: Pocket) {
     const pocketArticles = await pocket.getArticles();
     const notionDict = await notion.getArticlesAsDict();
 
@@ -31,7 +28,7 @@ async function setReadInNotion() {
     }) as const);
 }
 
- async function getMissingFromPocket() {
+ async function getMissingFromPocket(notion: Notion, pocket: Pocket) {
     const notionArticles = await notion.getArticles();
     const pocketDict = await pocket.getArticlesAsDict();
 
@@ -42,7 +39,7 @@ async function setReadInNotion() {
         .map(notionToPocketAdd);
 }
 
-async function archiveReadInPocket() {
+async function archiveReadInPocket(notion: Notion, pocket: Pocket) {
     const notionArticles = await notion.getArticles();
     const pocketDict = await pocket.getArticlesAsDict();
 
@@ -54,11 +51,14 @@ async function archiveReadInPocket() {
 }
 
 async function main() {
-    const missingInPocket = await getMissingFromPocket();
-    const archiveInPocket = await archiveReadInPocket();
+    const notion = new Notion();
+    const pocket = new Pocket();
+
+    const missingInPocket = await getMissingFromPocket(notion, pocket);
+    const archiveInPocket = await archiveReadInPocket(notion, pocket);
     const pocketActions = [...missingInPocket, ...archiveInPocket];
 
-    const readInNotion = await setReadInNotion();
+    const readInNotion = await setReadInNotion(notion, pocket);
 
     console.log(pocketActions);
     console.log(readInNotion);
