@@ -4,3 +4,5 @@ declare module '@vihanb/notabase' {
     import Notabase from "notabase";
     export default Notabase;
 }
+
+declare module "pocket-api";
