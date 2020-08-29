@@ -50,6 +50,16 @@ export class ReadingList {
             });
     }
 
+    async syncedArticlesAsDict() {
+        const rows = await this.syncedArticles();
+        return Object.fromEntries(rows.map(row => [row.url, row]));
+    }
+
+    async rawArticles() {
+        const { rows } = await this.page;
+        return rows;
+    }
+
     async updateRow<T extends UpdatableKeys>(id: NotionItem["id"], property: T, value: ReadingListItem[T]) {
         const { rows } = await this.page;
         const row = rows.find(r => r.id === id);

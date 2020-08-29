@@ -29,17 +29,19 @@ export type PocketApiAction =
 
 export class Pocket {
     private pocket: any;
+    private articles: Promise<{ list: any[]}>
 
     constructor() {
         this.pocket = new RealPocket(process.env.POCKET_CONSUMER_KEY);
         this.pocket.setAccessToken(process.env.POCKET_ACCESS_TOKEN);
+        this.articles = pocket.getArticles({
+            state: "all",
+            contentType: "article"
+        })
     }
 
     async getArticles(): Promise<PocketItem[]> {
-        const response = await pocket.getArticles({
-            state: "all",
-            contentType: "article"
-        });
+        const response = await this.articles;
 
         return Object.values(response.list).map((article: any) => ({
             id: article.item_id,
@@ -51,6 +53,11 @@ export class Pocket {
     async getArticlesAsDict<T extends keyof PocketItem>(prop?: T) {
         const articles = await this.getArticles();
         return Object.fromEntries(articles.map(a => [a[prop || "url"], a]));
+    }
+
+    async rawArticles() {
+        const response = await this.articles;
+        return Object.values(response.list);
     }
 
     async updateArticles(actions: PocketApiAction[]) {
