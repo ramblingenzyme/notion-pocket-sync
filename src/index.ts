@@ -1,5 +1,4 @@
 import "dotenv/config";
-// @ts-ignore
 import Notabase from "@vihanb/notabase";
 
 const nb = new Notabase({
