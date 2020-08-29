@@ -2,6 +2,12 @@ import "dotenv/config";
 import { PocketStatus, PocketItem, Pocket } from "./pocket";
 import { NotionItem, NotionStatus, ReadingList } from "./notion";
 
+/* TODO:
+* Set status in Notion to read if archived in Pocket
+* Move out of Pocket archive if not read in Notion
+* Add new Pocket saves to Notion
+*/
+
 const notionToPocketAdd = (item: NotionItem) => ({
     action: "add",
     url: item.url,
