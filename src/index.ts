@@ -1,6 +1,7 @@
 import "dotenv/config";
-import { PocketStatus, PocketItem, Pocket } from "./pocket";
-import { NotionItem, NotionStatus, ReadingList } from "./notion";
+import { Pocket } from "./pocket";
+import { NotionStatus, Notion } from "./notion";
+import { wasUpdatedLast, readInPocket, unreadInNotion, notionToPocketAdd, readInNotion, unreadInPocket, pocketToArchiveAction } from "./helpers";
 
 /* TODO:
 [v] Set status in Notion to read if archived in Pocket
@@ -9,58 +10,61 @@ import { NotionItem, NotionStatus, ReadingList } from "./notion";
 [] Add new Pocket saves to Notion
 */
 
-const notionToPocketAdd = (item: NotionItem) => ({
-    action: "add",
-    url: item.url,
-}) as const;
-
-const pocketToArchiveAction = (pocketItem: PocketItem) => ({
-    action: "archive",
-    item_id: pocketItem.id,
-}) as const;
-
-const readingList = new ReadingList();
+const notion = new Notion();
 const pocket = new Pocket();
 
-const readInPocket = (item?: PocketItem) => item?.status === PocketStatus.ARCHIVED;
-const unreadInPocket = (item?: PocketItem) => item?.status === PocketStatus.UNREAD;
-
-const readInNotion = (item?: NotionItem) => item?.status === NotionStatus.READ;
-const unreadInNotion = (item?: NotionItem) => item?.status === NotionStatus.UNREAD || item?.status === NotionStatus.READING;
-
-async function syncPocketReadToNotion() {
+async function setReadInNotion() {
     const pocketArticles = await pocket.getArticles();
-    const notionDict = await readingList.syncedArticlesAsDict();
+    const notionDict = await notion.getArticlesAsDict();
 
     // Sets status to read in Notion if archived in Pocket
     const readUrls = pocketArticles
-        .filter(item => readInPocket(item) && unreadInNotion(notionDict[item.url]))
+        .filter(item => wasUpdatedLast(item, notionDict[item.url]) && readInPocket(item) && unreadInNotion(notionDict[item.url]))
         .map(item => item.url)
 
     const readIds = readUrls.map(url => notionDict[url]?.id).filter(x => !!x);
-    for (const readId of readIds) {
-        readingList.updateRow(readId, "Status", NotionStatus.READ);
-    }
+
+    return readIds.map(id => ({
+        id,
+        type: "set-status",
+        status: NotionStatus.READ,
+    }) as const);
 }
 
-async function syncNotionToPocket() {
-    const syncedNotionEntries = await readingList.syncedArticles();
+ async function getMissingFromPocket() {
+    const notionArticles = await notion.getArticles();
     const pocketDict = await pocket.getArticlesAsDict();
 
     // If I've read an article before it can go into Pocket, then whatever.
     // Adds urls to Pocket that are in Notion
-    const addPocketApiActions = syncedNotionEntries
-        .filter(item => !pocketDict[item.url] && unreadInNotion(item))
+    return notionArticles
+        .filter(item => pocketDict[item.url] === undefined && unreadInNotion(item))
         .map(notionToPocketAdd);
-
-    // Archives Pocket entries marked as read in Notion
-    const archivePocketApiActions = syncedNotionEntries
-        .filter(entry => readInNotion(entry) && unreadInPocket(pocketDict[entry.url]))
-        .map(item => pocketToArchiveAction(pocketDict[item.url]))
-        .filter(item => item !== null);
-
-    await pocket.updateArticles([...addPocketApiActions, ...archivePocketApiActions]);
 }
 
-syncNotionToPocket()
-    .then(syncPocketReadToNotion);
+async function archiveReadInPocket() {
+    const notionArticles = await notion.getArticles();
+    const pocketDict = await pocket.getArticlesAsDict();
+
+    // Archives Pocket entries marked as read in Notion
+    return notionArticles
+        .filter(item => wasUpdatedLast(item, pocketDict[item.url]) && readInNotion(item) && unreadInPocket(pocketDict[item.url]))
+        .map(item => pocketToArchiveAction(pocketDict[item.url]))
+        .filter(item => item !== null);
+}
+
+async function main() {
+    const missingInPocket = await getMissingFromPocket();
+    const archiveInPocket = await archiveReadInPocket();
+    const pocketActions = [...missingInPocket, ...archiveInPocket];
+
+    const readInNotion = await setReadInNotion();
+
+    console.log(pocketActions);
+    console.log(readInNotion);
+
+    await pocket.updateArticles(pocketActions);
+    await notion.runApiActions(readInNotion);
+}
+
+main();

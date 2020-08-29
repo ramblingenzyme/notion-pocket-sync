@@ -10,8 +10,9 @@ type NotionItemId = string & { _: "NotionItemId" };
 
 export interface NotionItem {
     id: NotionItemId;
-    url: string;
+    lastUpdated: Date;
     status: NotionStatus;
+    url: string;
 }
 
 export interface ReadingListItem {
@@ -21,11 +22,25 @@ export interface ReadingListItem {
     Name: string;
     Tags: string[];
     URL: string;
+    delete: () => void;
 }
 
-type UpdatableKeys = keyof Omit<ReadingListItem, "id">;
+export type NotionApiAction =
+    | {
+        type: "set-status";
+        id: NotionItemId;
+        status: NotionStatus;
+    }
+    | {
+        type: "delete";
+        id: NotionItemId;
+    }
+    | {
+        type: "create";
+        value: Omit<NotionItem, "id" | "lastUpdated">;
+    }
 
-export class ReadingList {
+export class Notion {
     private page: Promise<Collection>;
     private nb: Notabase;
 
@@ -36,38 +51,52 @@ export class ReadingList {
         this.page = this.nb.fetch(process.env.READING_LIST_PAGE);
     }
 
-    async syncedArticles(): Promise<NotionItem[]> {
+    async getArticles(): Promise<NotionItem[]> {
         const { rows } = await this.page;
         return rows
             .filter(e => e.syncPocket)
-            .map(e => {
-                console.log(e);
-                return ({
-                    id: e.id,
-                    url: e.URL,
-                    status: e.Status,
-                });
-            });
+            .map(e => ({
+                id: e.id,
+                url: e.URL,
+                status: e.Status,
+                lastUpdated: new Date(e.last_edited_time),
+            }));
     }
 
-    async syncedArticlesAsDict() {
-        const rows = await this.syncedArticles();
+    async getArticlesAsDict() {
+        const rows = await this.getArticles();
         return Object.fromEntries(rows.map(row => [row.url, row]));
     }
 
-    async rawArticles() {
+    private async getRowById(id: NotionItemId): Promise<ReadingListItem | undefined> {
         const { rows } = await this.page;
-        return rows;
+        return rows.find(r => r.id === id);
     }
 
-    async updateRow<T extends UpdatableKeys>(id: NotionItem["id"], property: T, value: ReadingListItem[T]) {
-        const { rows } = await this.page;
-        const row = rows.find(r => r.id === id);
-
-        if (!row) {
-            throw new Error("Row doesn't exist");
+    private async runApiAction(action: NotionApiAction) {
+        const page = await this.page;
+        if (action.type === "create") {
+            page.addRow(action.value);
+            return;
         }
 
-        row[property] = value;
+        const row = await this.getRowById(action.id);
+        if (!row) {
+            console.warn("Couldn't find row for id");
+            return;
+        }
+
+        switch (action.type) {
+            case "set-status":
+                row.Status = action.status;
+            case "delete":
+                row.delete();
+        }
+    }
+
+    async runApiActions(actions: NotionApiAction[]) {
+        for (const action of actions) {
+            await this.runApiAction(action);
+        }
     }
 }

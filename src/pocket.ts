@@ -1,8 +1,5 @@
 import RealPocket from "pocket-api";
 
-const pocket = new RealPocket(process.env.POCKET_CONSUMER_KEY);
-pocket.setAccessToken(process.env.POCKET_ACCESS_TOKEN)
-
 export enum PocketStatus {
     UNREAD = 0,
     ARCHIVED = 1,
@@ -13,8 +10,9 @@ type PocketItemId = string & {_: "PocketItemId"};
 
 export interface PocketItem {
     id: PocketItemId;
-    url: string;
+    lastUpdated: Date;
     status: PocketStatus;
+    url: string;
 }
 
 export type PocketApiAction = 
@@ -36,7 +34,6 @@ export class Pocket {
         this.pocket.setAccessToken(process.env.POCKET_ACCESS_TOKEN);
         this.articles = pocket.getArticles({
             state: "all",
-            contentType: "article"
         })
     }
 
@@ -45,22 +42,27 @@ export class Pocket {
 
         return Object.values(response.list).map((article: any) => ({
             id: article.item_id,
-            url: article.given_url,
+            lastUpdated: new Date(Number(article.time_updated) * 1000),
             status: article.status,
+            url: article.given_url,
+            resolved: article.resolved_url,
         }));
     }
 
-    async getArticlesAsDict<T extends keyof PocketItem>(prop?: T) {
+    async getArticlesAsDict() {
         const articles = await this.getArticles();
-        return Object.fromEntries(articles.map(a => [a[prop || "url"], a]));
-    }
+        const original = Object.fromEntries(articles.map(a => [a.url, a]));
+        const resolved = Object.fromEntries(articles.map(a => [(a as any).resolved, a]))
 
-    async rawArticles() {
-        const response = await this.articles;
-        return Object.values(response.list);
+        return {
+            ...resolved,
+            ...original,
+        }
     }
 
     async updateArticles(actions: PocketApiAction[]) {
-        return pocket.modifyArticles(actions);
+        if (actions.length) {
+            return pocket.modifyArticles(actions);
+        }
     }
 }
