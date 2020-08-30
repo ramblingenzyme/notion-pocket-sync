@@ -60,8 +60,11 @@ async function main() {
 
     const readInNotion = await setReadInNotion(notion, pocket);
 
-    console.log(pocketActions);
-    console.log(readInNotion);
+    if (process.env.DEBUG) {
+        console.log(pocketActions);
+        console.log(readInNotion);
+        return;
+    }
 
     await pocket.updateArticles(pocketActions);
     await notion.runApiActions(readInNotion);

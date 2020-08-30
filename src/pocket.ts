@@ -1,9 +1,9 @@
 import RealPocket from "pocket-api";
 
 export enum PocketStatus {
-    UNREAD = 0,
-    ARCHIVED = 1,
-    DELETED = 2,
+    UNREAD = "0",
+    ARCHIVED = "1",
+    DELETED = "2",
 }
 
 type PocketItemId = string & {_: "PocketItemId"};
@@ -32,7 +32,7 @@ export class Pocket {
     constructor() {
         this.pocket = new RealPocket(process.env.POCKET_CONSUMER_KEY);
         this.pocket.setAccessToken(process.env.POCKET_ACCESS_TOKEN);
-        this.articles = pocket.getArticles({
+        this.articles = this.pocket.getArticles({
             state: "all",
         })
     }
@@ -62,7 +62,7 @@ export class Pocket {
 
     async updateArticles(actions: PocketApiAction[]) {
         if (actions.length) {
-            return pocket.modifyArticles(actions);
+            return this.pocket.modifyArticles(actions);
         }
     }
 }

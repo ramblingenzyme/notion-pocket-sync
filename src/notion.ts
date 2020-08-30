@@ -89,8 +89,10 @@ export class Notion {
         switch (action.type) {
             case "set-status":
                 row.Status = action.status;
+                break;
             case "delete":
                 row.delete();
+                break;
         }
     }
 
