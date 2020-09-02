@@ -1,4 +1,5 @@
 import RealPocket from "pocket-api";
+import keyBy from "lodash.keyby";
 
 export enum PocketStatus {
     UNREAD = "0",
@@ -51,12 +52,10 @@ export class Pocket {
 
     async getArticlesAsDict() {
         const articles = await this.getArticles();
-        const original = Object.fromEntries(articles.map(a => [a.url, a]));
-        const resolved = Object.fromEntries(articles.map(a => [(a as any).resolved, a]))
 
         return {
-            ...resolved,
-            ...original,
+            ...keyBy(articles, article => article.url),
+            ...keyBy(articles, article => (article as any).resolved),
         }
     }
 

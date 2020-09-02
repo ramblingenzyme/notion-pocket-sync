@@ -1,4 +1,5 @@
 import Notabase, { Collection } from "@vihanb/notabase";
+import keyBy from "lodash.keyby";
 
 export enum NotionStatus {
     READ = "Read",
@@ -65,7 +66,7 @@ export class Notion {
 
     async getArticlesAsDict() {
         const rows = await this.getArticles();
-        return Object.fromEntries(rows.map(row => [row.url, row]));
+        return keyBy(rows, row => row.url);
     }
 
     private async getRowById(id: NotionItemId): Promise<ReadingListItem | undefined> {
