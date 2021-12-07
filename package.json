@@ -4,7 +4,9 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "start": "TS_NODE_FILES=true ts-node src/index.ts"
+    "build": "tsc",
+    "start": "TS_NODE_FILES=true ts-node src/index.ts",
+    "start:prod": "node dist/index.js"
   },
   "jest": {
     "preset": "ts-jest"
