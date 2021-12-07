@@ -1,5 +1,5 @@
-import Notabase, { Collection } from "@vihanb/notabase";
 import keyBy from "lodash.keyby";
+import { Client } from "@notionhq/client";
 
 export enum NotionStatus {
     READ = "Read",
@@ -42,26 +42,55 @@ export type NotionApiAction =
     }
 
 export class Notion {
-    private page: Promise<Collection>;
-    private nb: Notabase;
+    private notion: Client;
+    private rows: NotionItem[] | undefined;
 
     constructor() {
-        this.nb = new Notabase({
-            token: process.env.NOTION_AUTH,
+        this.notion = new Client({
+            auth: process.env.NOTION_TOKEN,
         });
-        this.page = this.nb.fetch(process.env.READING_LIST_PAGE);
     }
 
     async getArticles(): Promise<NotionItem[]> {
-        const { rows } = await this.page;
-        return rows
-            .filter(e => e.syncPocket)
-            .map(e => ({
-                id: e.id,
-                url: e.URL,
-                status: e.Status,
-                lastUpdated: new Date(e.last_edited_time),
-            }));
+        if (this.rows?.length) {
+            return this.rows;
+        }
+
+        const result = await this.notion.databases.query({ 
+            database_id: process.env.READING_LIST_DB_ID as string,
+            filter: {
+                property: "syncPocket",
+                checkbox: {
+                    equals: true
+                }
+            }
+        });
+
+        if (result.object !== "list") {
+            throw new Error("Not a list");
+        }
+
+        const { results: rows } = result;
+
+        this.rows = rows
+            .filter(r => r.object === "page")
+            .map(r => {
+                const url = r.properties.URL.type === "url" ? r.properties.URL.url : undefined;
+                const status = r.properties.Status.type === "select" ? r.properties.Status.select?.name : undefined;
+
+                if (!url || !status) {
+                    throw new Error("Missing properties");
+                }
+
+                return ({
+                    id: r.id as NotionItemId,
+                    url,
+                    status: status as NotionStatus,
+                    lastUpdated: new Date(r.last_edited_time),
+                });
+            });
+
+        return this.rows;
     }
 
     async getArticlesAsDict() {
@@ -69,30 +98,38 @@ export class Notion {
         return keyBy(rows, row => row.url);
     }
 
-    private async getRowById(id: NotionItemId): Promise<ReadingListItem | undefined> {
-        const { rows } = await this.page;
+    private async getRowById(id: NotionItemId): Promise<NotionItem | undefined> {
+        const rows = await this.getArticles();
         return rows.find(r => r.id === id);
     }
 
     private async runApiAction(action: NotionApiAction) {
-        const page = await this.page;
-        if (action.type === "create") {
-            page.addRow(action.value);
-            return;
-        }
-
-        const row = await this.getRowById(action.id);
-        if (!row) {
-            console.warn("Couldn't find row for id");
-            return;
-        }
-
         switch (action.type) {
+            case "create":
+                await this.notion.pages.create({
+                    parent: {
+                        database_id: process.env.READING_LIST_DB_ID as string,
+                    },
+                    properties: {
+                        URL: action.value.url,
+                        Status: action.value.status
+                    }
+                });
+                break;
+
             case "set-status":
-                row.Status = action.status;
+                await this.notion.pages.update({
+                    page_id: action.id,
+                    properties: {
+                        Status: action.status
+                    }
+                })
                 break;
             case "delete":
-                row.delete();
+                await this.notion.pages.update({
+                    page_id: action.id,
+                    archived: true,
+                })
                 break;
         }
     }

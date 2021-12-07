@@ -50,12 +50,12 @@ export class Pocket {
         }));
     }
 
-    async getArticlesAsDict() {
+    async getArticlesAsDict(): Promise<Record<string, PocketItem>> {
         const articles = await this.getArticles();
 
         return {
-            ...keyBy(articles, article => article.url),
-            ...keyBy(articles, article => (article as any).resolved),
+            ...keyBy<PocketItem>(articles, article => article.url),
+            ...keyBy<PocketItem>(articles, article => (article as any).resolved),
         }
     }
 
