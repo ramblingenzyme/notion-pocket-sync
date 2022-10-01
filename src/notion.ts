@@ -1,5 +1,6 @@
 import keyBy from "lodash.keyby";
 import { Client } from "@notionhq/client";
+import { PageObjectResponse } from "@notionhq/client/build/src/api-endpoints";
 
 export enum NotionStatus {
     READ = "Read",
@@ -74,7 +75,7 @@ export class Notion {
         const { results: rows } = result;
 
         this.rows = rows
-            .filter(r => r.object === "page")
+            .filter((r): r is PageObjectResponse => r.object === "page" && "properties" in r)
             .map(r => {
                 const url = r.properties.URL.type === "url" ? r.properties.URL.url : undefined;
                 const status = r.properties.Status.type === "select" ? r.properties.Status.select?.name : undefined;
@@ -114,9 +115,22 @@ export class Notion {
                         database_id: process.env.READING_LIST_DB_ID as string,
                     },
                     properties: {
-                        URL: action.value.url,
-                        Status: action.value.status,
-                        Name: action.value.title,
+                        URL: {
+                            url: action.value.url,
+                        },
+                        Status: {
+                            select: {
+                                name: action.value.status
+                            }
+                        },
+                        Name: {
+                            title: [{
+                                text: {
+                                    content: action.value.title
+                                }
+                            }],
+                            type: "title"
+                        }
                     }
                 });
                 break;

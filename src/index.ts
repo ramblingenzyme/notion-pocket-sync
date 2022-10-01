@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { Pocket } from "./pocket";
 import { NotionStatus, Notion, NotionApiAction } from "./notion";
-import { wasUpdatedLast, readInPocket, unreadInNotion, notionToPocketAdd, readInNotion, unreadInPocket, pocketToArchiveAction, pocketToAddAction, deletedInPocket } from "./helpers";
+import { wasUpdatedLast, readInPocket, unreadInNotion, notionToPocketAdd, readInNotion, unreadInPocket, pocketToArchiveAction, pocketToAddAction } from "./helpers";
 
 /* TODO:
 [x] Set status in Notion to read if archived in Pocket
