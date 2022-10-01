@@ -115,6 +115,9 @@ export class Notion {
                         database_id: process.env.READING_LIST_DB_ID as string,
                     },
                     properties: {
+                        syncPocket: {
+                            checkbox: true,
+                        },
                         URL: {
                             url: action.value.url,
                         },
