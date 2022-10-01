@@ -1,13 +1,12 @@
 import "dotenv/config";
 import { Pocket } from "./pocket";
-import { NotionStatus, Notion } from "./notion";
-import { wasUpdatedLast, readInPocket, unreadInNotion, notionToPocketAdd, readInNotion, unreadInPocket, pocketToArchiveAction } from "./helpers";
+import { NotionStatus, Notion, NotionApiAction } from "./notion";
+import { wasUpdatedLast, readInPocket, unreadInNotion, notionToPocketAdd, readInNotion, unreadInPocket, pocketToArchiveAction, pocketToAddAction, deletedInPocket } from "./helpers";
 
 /* TODO:
-[v] Set status in Notion to read if archived in Pocket
-[] Move out of Pocket archive if not read in Notion
-[] Set status in Notion to reading if unarchived in Pocket?
-[] Add new Pocket saves to Notion
+[x] Set status in Notion to read if archived in Pocket
+[x] Add new Pocket saves to Notion
+[] Sync tags
 */
 
 export async function setReadInNotion(notion: Notion, pocket: Pocket) {
@@ -16,7 +15,10 @@ export async function setReadInNotion(notion: Notion, pocket: Pocket) {
 
     // Sets status to read in Notion if archived in Pocket
     const readUrls = pocketArticles
-        .filter(item => wasUpdatedLast(item, notionDict[item.url]) && readInPocket(item) && unreadInNotion(notionDict[item.url]))
+        .filter(item => {
+            const notionItem = notionDict[item.url]
+            return wasUpdatedLast(item, notionItem) && readInPocket(item) && unreadInNotion(notionItem);
+        })
         .map(item => item.url)
 
     const readIds = readUrls.map(url => notionDict[url]?.id).filter(x => !!x);
@@ -26,6 +28,16 @@ export async function setReadInNotion(notion: Notion, pocket: Pocket) {
         type: "set-status",
         status: NotionStatus.READ,
     }) as const);
+}
+
+export async function getMissingFromNotion(notion: Notion, pocket: Pocket) {
+    const pocketArticles = await pocket.getArticles()
+    const notionDict = await notion.getArticlesAsDict();
+
+    return pocketArticles
+        .filter(item => !notionDict[item.url])
+        .map(pocketToAddAction)
+        .filter((x): x is NotionApiAction => typeof x !== "undefined")
 }
 
 export async function getMissingFromPocket(notion: Notion, pocket: Pocket) {
@@ -51,20 +63,27 @@ export async function archiveReadInPocket(notion: Notion, pocket: Pocket) {
 }
 
 export async function main(notion: Notion, pocket: Pocket) {
-    const missingInPocket = await getMissingFromPocket(notion, pocket);
-    const archiveInPocket = await archiveReadInPocket(notion, pocket);
-    const pocketActions = [...missingInPocket, ...archiveInPocket];
+    const nestedNotionActions = await Promise.all([
+        setReadInNotion(notion, pocket),
+        getMissingFromNotion(notion, pocket)
+    ]);
 
-    const readInNotion = await setReadInNotion(notion, pocket);
+    const nestedPocketActions = await Promise.all([
+        getMissingFromPocket(notion, pocket),
+        archiveReadInPocket(notion, pocket),
+    ]);
+
+    const notionActions = nestedNotionActions.flat();
+    const pocketActions = nestedPocketActions.flat();
 
     if (process.env.DEBUG) {
-        console.log(pocketActions);
-        console.log(readInNotion);
+        console.log(JSON.stringify(pocketActions, null, 4));
+        console.log(JSON.stringify(notionActions, null, 4));
         return;
     }
 
     await pocket.updateArticles(pocketActions);
-    await notion.runApiActions(readInNotion);
+    await notion.runApiActions(notionActions);
 }
 
 if (process.env.NODE_ENV !== "test") {

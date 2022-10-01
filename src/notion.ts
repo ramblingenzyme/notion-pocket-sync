@@ -14,6 +14,7 @@ export interface NotionItem {
     lastUpdated: Date;
     status: NotionStatus;
     url: string;
+    title: string;
 }
 
 export interface ReadingListItem {
@@ -77,6 +78,7 @@ export class Notion {
             .map(r => {
                 const url = r.properties.URL.type === "url" ? r.properties.URL.url : undefined;
                 const status = r.properties.Status.type === "select" ? r.properties.Status.select?.name : undefined;
+                const title = r.properties.Name.type === "title" ? r.properties.Name.title?.[0]?.plain_text : "";
 
                 if (!url || !status) {
                     throw new Error("Missing properties");
@@ -86,6 +88,7 @@ export class Notion {
                     id: r.id as NotionItemId,
                     url,
                     status: status as NotionStatus,
+                    title: title,
                     lastUpdated: new Date(r.last_edited_time),
                 });
             });
@@ -112,7 +115,8 @@ export class Notion {
                     },
                     properties: {
                         URL: action.value.url,
-                        Status: action.value.status
+                        Status: action.value.status,
+                        Name: action.value.title,
                     }
                 });
                 break;

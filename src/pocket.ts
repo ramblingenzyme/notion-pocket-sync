@@ -14,6 +14,7 @@ export interface PocketItem {
     lastUpdated: Date;
     status: PocketStatus;
     url: string;
+    title: string;
 }
 
 export type PocketApiAction = 
@@ -46,7 +47,7 @@ export class Pocket {
             lastUpdated: new Date(Number(article.time_updated) * 1000),
             status: article.status,
             url: article.given_url,
-            resolved: article.resolved_url,
+            title: article.resolved_title
         }));
     }
 
