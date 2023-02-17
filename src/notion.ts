@@ -6,6 +6,7 @@ export enum NotionStatus {
     READ = "Read",
     UNREAD = "To Read",
     READING = "Reading",
+    NONE = "NONE"
 }
 
 type NotionItemId = string & { _: "NotionItemId" };
@@ -78,11 +79,11 @@ export class Notion {
             .filter((r): r is PageObjectResponse => r.object === "page" && "properties" in r)
             .map(r => {
                 const url = r.properties.URL.type === "url" ? r.properties.URL.url : undefined;
-                const status = r.properties.Status.type === "select" ? r.properties.Status.select?.name : undefined;
+                const status = (r.properties.Status.type === "select" ? r.properties.Status.select?.name : undefined) || NotionStatus.NONE;
                 const title = r.properties.Name.type === "title" ? r.properties.Name.title?.[0]?.plain_text : "";
 
-                if (!url || !status) {
-                    throw new Error("Missing properties");
+                if (!url) {
+                    throw new Error("Missing url");
                 }
 
                 return ({
@@ -142,7 +143,11 @@ export class Notion {
                 await this.notion.pages.update({
                     page_id: action.id,
                     properties: {
-                        Status: action.status
+                        Status: {
+                            select: {
+                                name: action.status
+                            }
+                        }
                     }
                 })
                 break;

@@ -62,8 +62,21 @@ export async function archiveReadInPocket(notion: Notion, pocket: Pocket) {
         .filter(item => item !== null);
 }
 
+export async function setDefaultStatus(notion: Notion, pocket: Pocket): Promise<NotionApiAction[]> {
+    const notionArticles = await notion.getArticles();
+    // Archives Pocket entries marked as read in Notion
+    return notionArticles
+        .filter(item => item.status === NotionStatus.NONE)
+        .map(item => ({
+            type: "set-status",
+            id: item.id,
+            status: NotionStatus.UNREAD 
+        }))
+}
+
 export async function main(notion: Notion, pocket: Pocket) {
     const nestedNotionActions = await Promise.all([
+        setDefaultStatus(notion, pocket),
         setReadInNotion(notion, pocket),
         getMissingFromNotion(notion, pocket)
     ]);
